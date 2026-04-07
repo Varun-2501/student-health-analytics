@@ -28,16 +28,8 @@ from langgraph.graph import StateGraph, START, END
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 
-# FIX 1: Updated deprecated imports
-try:
-    from langchain_huggingface import HuggingFaceEmbeddings
-except ImportError:
-    from langchain_community.embeddings import HuggingFaceEmbeddings
+# FIX 1: Updated deprecated import
 
-try:
-    from langchain_chroma import Chroma
-except ImportError:
-    from langchain_community.vectorstores import Chroma
 
 
 # -------------------------
@@ -534,17 +526,28 @@ def create_rag_index(text):
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     chunks = splitter.split_text(text)
     docs = [Document(page_content=c) for c in chunks]
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    vectorstore = Chroma.from_documents(docs, embedding=embeddings)
-    return vectorstore
+    return docs
 
 
-def rag_query(vectorstore, question):
+def rag_query(docs, question):
     if llm is None:
-        return "⚠️ AI assistant unavailable: missing API key."
-    docs = vectorstore.similarity_search(question, k=3)
-    context = "\n".join([d.page_content for d in docs])
-    prompt = f"""You are a medical AI assistant.\n\nUse the context below to answer.\n\nContext:\n{context}\n\nQuestion:\n{question}\n\nGive clear medical insights."""
+        return "⚠️ AI assistant unavailable"
+
+    # simple retrieval (top 3 chunks)
+    context = "\n".join([d.page_content for d in docs[:3]])
+
+    prompt = f"""
+You are a medical AI assistant.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Give clear medical insights.
+"""
+
     response = llm.invoke([HumanMessage(content=prompt)])
     return response.content
 
